@@ -6,10 +6,10 @@ Slowly building this. I think it'll be fun and usable, no need to rename files i
 - [x] support user inputs
 - [x] save user inputs for later reuse
 - [ ] threshold for user inputs
-- [ ] Copy or Replace current file flag (destination directory for copy)
-- [ ] Batch Process
+- [x] Copy or Replace current file flag (destination directory for copy)
+- [x] Batch Process
 - [ ] Replace or countup flag for same name conflicts
 - [ ] Single Keypress if possible for input
-- [ ] Add colors for different kind of input (choice+manual)
+- [x] Add colors for different kind of input (choice+manual)
 - [ ] support file metadata extration for variables
 - [ ] compile for windows

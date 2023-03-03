@@ -1,6 +1,7 @@
 use clap::Parser;
 use colored::Colorize;
 use directories::ProjectDirs;
+use number_range::NumberRangeOptions;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
@@ -17,16 +18,53 @@ struct Cli {
     ///
     /// formats given in CLI are not saved in history, it helps when
     /// batch processing a list of files with similar format at once,
-    /// use `NNN` character format for zero padded numbers.
+    /// use `NNN` character format for zero padded numbers. If not
+    /// given asks interactively.
     #[arg(short, long)]
     format: Option<String>,
+    /// Destination directory
+    ///
+    /// Move or Rename the file to the destination directory instead
+    /// of the current one.
+    #[arg(short, long)]
+    destination: Option<PathBuf>,
     /// Repeat Last choice
+    ///
+    /// Choose the first option for all the interactive choices. Be
+    /// careful using this one on formats without the number (N, NN,
+    /// etc.) variable, as all the files will be names the same. And
+    /// the number format will only work for a single execution, even
+    /// if you've used it before for different files, it'll restart
+    /// from 1.
     #[arg(short, long, action)]
     last: bool,
     /// Rename given file
+    ///
+    /// Instead of copying, rename the current file. Only works for
+    /// files in the same mount point, if you have files in different
+    /// mount points, you have to copy it separately.
     #[arg(short, long, action)]
     rename: bool,
+    /// Edit saved choices
+    ///
+    /// Gives you interactive options to edit the choices. Use it to
+    /// permanently filter the options.
+    #[arg(short, long, action)]
+    edit: bool,
+    /// Print the new filename and do nothing
+    #[arg(short, long, action)]
+    test: bool,
+    /// Number of choices to show from history
+    ///
+    /// unimplemented, shows all currently.
+    #[arg(short, long, default_value = "10")]
+    choices: usize,
     /// Paths to rename
+    ///
+    /// If you have more than one path then any number of character
+    /// `N` in the format string will be replaced with the loop index
+    /// (starting at 1), you can use that system to batch rename
+    /// files.
     paths: Vec<PathBuf>,
 }
 
@@ -74,7 +112,7 @@ fn read_history(path: &PathBuf) -> Result<History, Box<dyn Error>> {
     Ok(hist)
 }
 
-fn choose(prompt: &str, vec: &mut Vec<String>) -> Result<String, Box<dyn Error>> {
+fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, Box<dyn Error>> {
     let mut i = 1;
     let mut manual = vec.len() == 0;
     let mut buf = String::new();
@@ -86,33 +124,62 @@ fn choose(prompt: &str, vec: &mut Vec<String>) -> Result<String, Box<dyn Error>>
             println!("  [{}] {}", i, h);
             i += 1;
         }
+        let def = if filter {
+            format!("1-{}", vec.len())
+        } else {
+            "1".to_string()
+        };
         loop {
-            print!("{} <1>: ", "Choice".on_blue().bold());
+            print!("{} <{}>: ", "Select".on_blue().bold(), def);
             std::io::stdout().flush()?;
             std::io::stdin().read_line(&mut buf)?;
-            if buf.trim() == "" {
-                choice = 0
-            } else {
-                choice = match buf.trim().parse() {
-                    Ok(c) => {
-                        if c > vec.len() {
-                            eprintln!("{}: Enter from 0 to {} only", "Error".red(), vec.len());
+            match (buf.trim(), filter) {
+                ("", true) => return Ok(def),
+                ("", false) => choice = 0,
+                (b, true) => {
+                    let choices: HashSet<usize> = NumberRangeOptions::default()
+                        .with_list_sep(',')
+                        .with_range_sep('-')
+                        .parse(&b)?
+                        .collect();
+                    let mut new_vec: Vec<String> = vec
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(i, f)| {
+                            if choices.contains(&(i + 1)) {
+                                Some(f.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    vec.clear();
+                    vec.append(&mut new_vec);
+                    return Ok(buf);
+                }
+                (b, false) => {
+                    choice = match b.parse() {
+                        Ok(c) => {
+                            if c > vec.len() {
+                                eprintln!("{}: Enter from 0 to {} only", "Error".red(), vec.len());
+                                buf.clear();
+                                continue;
+                            } else {
+                                c
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}: {:?}", "Error".red(), e.kind());
                             buf.clear();
                             continue;
-                        } else {
-                            c
                         }
+                    };
+
+                    if choice == 0 {
+                        manual = true;
+                    } else {
+                        choice -= 1;
                     }
-                    Err(e) => {
-                        eprintln!("{}: {:?}", "Error".red(), e.kind());
-                        buf.clear();
-                        continue;
-                    }
-                };
-                if choice == 0 {
-                    manual = true;
-                } else {
-                    choice -= 1;
                 }
             }
             break;
@@ -137,6 +204,7 @@ fn choose(prompt: &str, vec: &mut Vec<String>) -> Result<String, Box<dyn Error>>
 }
 
 fn rename_filename(
+    cur: &str,
     hist: &mut History,
     fmt_str: &str,
     num: usize,
@@ -149,19 +217,28 @@ fn rename_filename(
                 if last {
                     Ok(k[0].clone())
                 } else {
-                    choose(v, &mut k)
+                    choose(v, &mut k, false)
                 }
             }
             None => {
                 if v.chars().all(|c| c == 'N') {
                     Ok(format!("{0:01$}", num, v.len()))
+                } else if v.chars().all(|c| c == '*') {
+                    Ok(format!(
+                        "{}",
+                        cur.split(".")
+                            .take(v.len())
+                            .collect::<Vec<&str>>()
+                            .join(".")
+                    ))
                 } else {
                     hist.variables.insert(v.to_string());
                     let mut newvec = vec![];
                     // here since the variable is not new when --last
                     // is used it won't happen, so I'll leave it be
-                    // interactive.
-                    let var = choose(v, &mut newvec);
+                    // interactive. Is manual format is given from
+                    // TUI, it'll need one time input.
+                    let var = choose(v, &mut newvec, false);
                     hist.values.insert(v.to_string(), newvec);
                     var
                 }
@@ -182,26 +259,75 @@ fn main() -> Result<(), Box<dyn Error>> {
     .data_dir()
     .join("histories.json");
     let mut hist = read_history(&hist_file)?;
+
+    if args.edit {
+        choose("Formats", &mut hist.formats, true)?;
+        let new_vars: HashSet<&str> = hist
+            .formats
+            .iter()
+            .map(|s| s.split("_"))
+            .flatten()
+            .collect();
+        let mut new_values = HashMap::<String, Vec<String>>::new();
+        for (k, v) in hist.values {
+            if !new_vars.contains(k.as_str()) {
+                println!(
+                    "{} : {}, dropping...",
+                    k,
+                    "Variable doesn't appear in any formats".red()
+                );
+                continue;
+            }
+            let mut v = v;
+            choose(&k, &mut v, true)?;
+            new_values.insert(k.to_string(), v.to_vec());
+        }
+        hist.variables = new_values.keys().map(|s| s.to_string()).collect();
+        hist.values = new_values;
+        save_history(&hist_file, &hist)?;
+        return Ok(());
+    }
+
+    if args.paths.len() == 0 {
+        return Ok(());
+    }
+
     let fmt_str = if let Some(f) = args.format {
         f
     } else {
         if args.last {
             hist.formats[0].clone()
         } else {
-            choose("Format", &mut hist.formats)?
+            choose("Format", &mut hist.formats, false)?
         }
     };
 
     for (i, filename) in args.paths.iter().enumerate() {
-        let new_name = filename
-            .with_file_name(rename_filename(&mut hist, &fmt_str, i + 1, args.last)?)
-            .with_extension(filename.extension().unwrap_or_default());
+        let mut new_name = filename.with_file_name(format!(
+            // .with_extension() thing didn't work as it removes any
+            // part of the name after first '.' in filename
+            "{}.{}",
+            rename_filename(
+                &filename.file_name().unwrap_or_default().to_string_lossy(),
+                &mut hist,
+                &fmt_str,
+                i + 1,
+                args.last,
+            )?,
+            filename.extension().unwrap_or_default().to_string_lossy()
+        ));
+        if let Some(d) = &args.destination {
+            new_name = d.join(new_name);
+        }
         println!(
             "{}: {:?} -> {:?}",
             "Copy".green().bold(),
             filename,
             new_name
         );
+        if args.test {
+            continue;
+        }
         if args.rename {
             std::fs::rename(filename, new_name)?;
         } else {
