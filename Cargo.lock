@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "anyhow"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "224afbd727c3d6e4b90103ece64b8d1b67fbb1973b1046c2281eed3f3803f800"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -220,7 +226,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f051f77a7c8e6957c0696eac88f26b0117e54f52d3fc682ab19397a8812846a4"
 
 [[package]]
-name = "nameit"
+name = "nam"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -310,10 +316,11 @@ dependencies = [
 
 [[package]]
 name = "number_range"
-version = "0.1.4"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f857a5a65ccef8ad3c9c34b45fe15ec6b26a13428d9f22c5517654dfc4a125fb"
+checksum = "e8a6ad9fbc045fc4d16b03f7cc0373a947811ecc54f0bbc2455c2425bcd4dd51"
 dependencies = [
+ "anyhow",
  "itertools",
  "num",
 ]

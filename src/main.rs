@@ -120,6 +120,9 @@ fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, B
 
     if !manual {
         println!("{} {}:", "Choices for".bold().blue(), prompt.bold().blue());
+        if !filter {
+            println!("  [0] {}", "<new entry>".bold().yellow());
+        }
         for h in &mut *vec {
             println!("  [{}] {}", i, h);
             i += 1;
@@ -140,6 +143,8 @@ fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, B
                     let choices: HashSet<usize> = NumberRangeOptions::default()
                         .with_list_sep(',')
                         .with_range_sep('-')
+                        .with_default_start(1)
+                        .with_default_end(vec.len())
                         .parse(&b)?
                         .collect();
                     let mut new_vec: Vec<String> = vec
@@ -186,6 +191,9 @@ fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, B
         }
     }
     if manual {
+        if filter {
+            return Ok("0".to_string());
+        }
         print!(
             "{}{}: ",
             "Input ".on_bright_green().black().bold(),
@@ -221,15 +229,17 @@ fn rename_filename(
                 }
             }
             None => {
-                if v.chars().all(|c| c == 'N') {
+                if v.chars().all(|c| c == '#') {
                     Ok(format!("{0:01$}", num, v.len()))
+                } else if v == "?" {
+                    Ok(cur.to_string())
                 } else if v.chars().all(|c| c == '*') {
                     Ok(format!(
                         "{}",
-                        cur.split(".")
+                        cur.split("_")
                             .take(v.len())
                             .collect::<Vec<&str>>()
-                            .join(".")
+                            .join("_")
                     ))
                 } else {
                     hist.variables.insert(v.to_string());
@@ -271,15 +281,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut new_values = HashMap::<String, Vec<String>>::new();
         for (k, v) in hist.values {
             if !new_vars.contains(k.as_str()) {
-                println!(
-                    "{} : {}, dropping...",
-                    k,
-                    "Variable doesn't appear in any formats".red()
-                );
-                continue;
+                println!("{} {}", k, "variable doesn't appear in any formats".red());
             }
             let mut v = v;
             choose(&k, &mut v, true)?;
+            if v.len() == 0 {
+                continue;
+            }
             new_values.insert(k.to_string(), v.to_vec());
         }
         hist.variables = new_values.keys().map(|s| s.to_string()).collect();
@@ -303,19 +311,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     for (i, filename) in args.paths.iter().enumerate() {
-        let mut new_name = filename.with_file_name(format!(
-            // .with_extension() thing didn't work as it removes any
-            // part of the name after first '.' in filename
-            "{}.{}",
-            rename_filename(
-                &filename.file_name().unwrap_or_default().to_string_lossy(),
-                &mut hist,
-                &fmt_str,
-                i + 1,
-                args.last,
-            )?,
-            filename.extension().unwrap_or_default().to_string_lossy()
-        ));
+        let ext = filename.extension();
+        let fname = rename_filename(
+            &filename.file_stem().unwrap_or_default().to_string_lossy(),
+            &mut hist,
+            &fmt_str,
+            i + 1,
+            args.last,
+        )?;
+        let mut new_name = match ext {
+            None => filename.with_file_name(fname),
+            Some(e) => filename.with_file_name(format!(
+                // .with_extension() thing didn't work as it removes any
+                // part of the name after first '.' in filename
+                "{}.{}",
+                fname,
+                e.to_string_lossy(),
+            )),
+        };
         if let Some(d) = &args.destination {
             new_name = d.join(new_name);
         }
