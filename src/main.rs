@@ -11,6 +11,8 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
+use term_grid;
+use terminal_size::{terminal_size, Width};
 
 #[derive(Parser)]
 struct Cli {
@@ -120,13 +122,26 @@ fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, B
 
     if !manual {
         println!("{} {}:", "Choices for".bold().blue(), prompt.bold().blue());
+        let mut grid = term_grid::Grid::new(term_grid::GridOptions {
+            filling: term_grid::Filling::Spaces(2),
+            direction: term_grid::Direction::LeftToRight,
+        });
         if !filter {
-            println!("  [0] {}", "<new entry>".bold().yellow());
+            grid.add(term_grid::Cell::from(format!(
+                "[0] {}",
+                "<new entry>".bold().yellow()
+            )));
         }
         for h in &mut *vec {
-            println!("  [{}] {}", i, h);
+            grid.add(term_grid::Cell::from(format!("  [{}] {}", i, h)));
             i += 1;
         }
+        let width: usize = if let Some((Width(w), _)) = terminal_size() {
+            w.into()
+        } else {
+            100
+        };
+        println!("{}", grid.fit_into_width(width).unwrap());
         let def = if filter {
             format!("1-{}", vec.len())
         } else {
@@ -334,7 +349,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         println!(
             "{}: {:?} -> {:?}",
-            "Copy".green().bold(),
+            (if args.rename { "Rename" } else { "Copy" }).green().bold(),
             filename,
             new_name
         );
