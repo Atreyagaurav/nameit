@@ -13,12 +13,12 @@ Clone the repo, and run `cargo build --release`.
 For arch users, simply download the `PKGBUILD` file and then do `makepkg` and `makepkg --install`.
 
 # Usage
-Run the command `nam` with filename as argument to rename. Provide the choices for format, and then variables in that format. Use `_` to separate the variables in the format. For example, format `NAME_VER` will use two variables `NAME` and `VER`, you can give inputs to those variables. It'll remember your inputs and save it for later use. 
+Run the command `nameit` with filename as argument to rename. Provide the choices for format, and then variables in that format. Use `_` to separate the variables in the format. For example, format `NAME_VER` will use two variables `NAME` and `VER`, you can give inputs to those variables. It'll remember your inputs and save it for later use. 
 
 When you have choices, enter the choice number to choose it, otherwise enter 0, and it'll give you the option to enter a new entry, it'll save that entry to the history.
 
 # Editing the Saved choices
-you can run `nam -e` to run an interactive session to filter the saved choices. 
+you can run `nameit -e` to run an interactive session to filter the saved choices. 
 
 You can filter the formats, (remember that if you remove a format and there are variables only used in that format, you can remove them by entering 0 for the choices to filter), you can filter the choices for the variables. Press enter with no inputs to just leave it be, otherwise, use `start-end` format that'll only keep the choices in that range (inclusive). You can just use `-end` or `start-` format, if you want to just denote the lower and upper limit only. For example, `1-5` will keep entries 1 to 5, and remove everything else, while `-5` also has the same effect, and something like `3-` will keep everything from 3 onwards and only remove 1 and 2.
 
