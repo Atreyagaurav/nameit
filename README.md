@@ -10,7 +10,9 @@ Slowly building this. I think it'll be fun and usable, no need to rename files i
 # Installation
 Clone the repo, and run `cargo build --release`.
 
-For arch users, simply download the `PKGBUILD` file and then do `makepkg` and `makepkg --install`.
+For arch users,
+- Get it from [AUR](https://aur.archlinux.org/packages/nameit), OR 
+- simply download the `PKGBUILD` file and then do `makepkg` and `makepkg --install`.
 
 # Usage
 Run the command `nameit` with filename as argument to rename. Provide the choices for format, and then variables in that format. Use `_` to separate the variables in the format. For example, format `NAME_VER` will use two variables `NAME` and `VER`, you can give inputs to those variables. It'll remember your inputs and save it for later use. 

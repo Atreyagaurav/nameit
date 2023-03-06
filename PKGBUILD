@@ -1,9 +1,9 @@
 # Maintainer: Gaurav Atreya <allmanpride at gmail dot com>
-pkgname=nam-it
-pkgver=0.1.1
+pkgname=nameit
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="Tool to run commands based on a templates"
-arch=('any')
+arch=('x86_64')
 url="https://github.com/Atreyagaurav/${pkgname}"
 license=('GPL3')
 depends=('gcc-libs')
