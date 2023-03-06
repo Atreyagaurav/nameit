@@ -1,3 +1,4 @@
+use chrono::Local;
 use clap::Parser;
 use colored::Colorize;
 use directories::ProjectDirs;
@@ -248,6 +249,8 @@ fn rename_filename(
                     Ok(format!("{0:01$}", num, v.len()))
                 } else if v == "?" {
                     Ok(cur.to_string())
+                } else if v.starts_with("%") {
+                    Ok(Local::now().format(&v).to_string())
                 } else if v.chars().all(|c| c == '*') {
                     Ok(format!(
                         "{}",

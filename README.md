@@ -6,7 +6,8 @@ Slowly building this. I think it'll be fun and usable, no need to rename files i
 - Uses the template system for different parts in a name,
 - Remembers the user inputs, so you can reuse the previous parts,
 - Just rename, or copy (default) the current file,
-- Can use numbering system, or reuse parts of the previous name
+- Can use numbering system, or reuse parts of the previous name,
+- Apply Timestamps
 # Installation
 Clone the repo, and run `cargo build --release`.
 
@@ -25,8 +26,12 @@ you can run `nameit -e` to run an interactive session to filter the saved choice
 You can filter the formats, (remember that if you remove a format and there are variables only used in that format, you can remove them by entering 0 for the choices to filter), you can filter the choices for the variables. Press enter with no inputs to just leave it be, otherwise, use `start-end` format that'll only keep the choices in that range (inclusive). You can just use `-end` or `start-` format, if you want to just denote the lower and upper limit only. For example, `1-5` will keep entries 1 to 5, and remove everything else, while `-5` also has the same effect, and something like `3-` will keep everything from 3 onwards and only remove 1 and 2.
 
 # Special Template Variables
+## Date Time
+For date time use a format accepted by `date` command, for example, `%Y` is year in 4 digits format, `%m` is month, and so on. Using `%F` will give you the date in `YYYY-MM-DD` format. See `man date` for more formats. Program will panic on incorrect format.
+
 ## Numbering
 Any variable with a multiple `#` character is considered a number format. It'll be rendered as loop index for the file being processed that starts with 1 and is zero padded. For example `###` will start from `001`.
+
 ## Old Filename Parts
 If you use `*` in the format, it will use the first part of the old filename, more * you have more parts it'll reuse. Parts are defined as the strings separated by `_`. You can use `?` to include the whole previous filename.
 
