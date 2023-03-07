@@ -12,7 +12,7 @@ Slowly building this. I think it'll be fun and usable, no need to rename files i
 Clone the repo, and run `cargo build --release`.
 
 For arch users,
-- Get it from [AUR](https://aur.archlinux.org/packages/nameit), OR 
+- Get it from [AUR: nameit-git](https://aur.archlinux.org/packages/nameit-git), OR 
 - simply download the `PKGBUILD` file and then do `makepkg` and `makepkg --install`.
 
 # Usage

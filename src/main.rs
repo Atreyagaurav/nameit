@@ -58,9 +58,7 @@ struct Cli {
     #[arg(short, long, action)]
     test: bool,
     /// Number of choices to show from history
-    ///
-    /// unimplemented, shows all currently.
-    #[arg(short, long, default_value = "10")]
+    #[arg(short, long, default_value = "20")]
     choices: usize,
     /// Paths to rename
     ///
@@ -115,8 +113,12 @@ fn read_history(path: &PathBuf) -> Result<History, Box<dyn Error>> {
     Ok(hist)
 }
 
-fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, Box<dyn Error>> {
-    let mut i = 1;
+fn choose(
+    prompt: &str,
+    vec: &mut Vec<String>,
+    filter: bool,
+    max_choice: usize,
+) -> Result<String, Box<dyn Error>> {
     let mut manual = vec.len() == 0;
     let mut buf = String::new();
     let mut choice: usize = 0;
@@ -133,9 +135,14 @@ fn choose(prompt: &str, vec: &mut Vec<String>, filter: bool) -> Result<String, B
                 "<new entry>".bold().yellow()
             )));
         }
+
+        let mut i = 1;
         for h in &mut *vec {
             grid.add(term_grid::Cell::from(format!("  [{}] {}", i, h)));
             i += 1;
+            if i > max_choice {
+                break;
+            }
         }
         let width: usize = if let Some((Width(w), _)) = terminal_size() {
             w.into()
@@ -233,6 +240,7 @@ fn rename_filename(
     fmt_str: &str,
     num: usize,
     last: bool,
+    max_choice: usize,
 ) -> Result<String, Box<dyn Error>> {
     let vars: Vec<String> = fmt_str
         .split("_")
@@ -241,7 +249,7 @@ fn rename_filename(
                 if last {
                     Ok(k[0].clone())
                 } else {
-                    choose(v, &mut k, false)
+                    choose(v, &mut k, false, max_choice)
                 }
             }
             None => {
@@ -266,7 +274,7 @@ fn rename_filename(
                     // is used it won't happen, so I'll leave it be
                     // interactive. Is manual format is given from
                     // TUI, it'll need one time input.
-                    let var = choose(v, &mut newvec, false);
+                    let var = choose(v, &mut newvec, false, max_choice);
                     hist.values.insert(v.to_string(), newvec);
                     var
                 }
@@ -289,7 +297,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut hist = read_history(&hist_file)?;
 
     if args.edit {
-        choose("Formats", &mut hist.formats, true)?;
+        choose("Formats", &mut hist.formats, true, args.choices)?;
         let new_vars: HashSet<&str> = hist
             .formats
             .iter()
@@ -302,7 +310,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("{} {}", k, "variable doesn't appear in any formats".red());
             }
             let mut v = v;
-            choose(&k, &mut v, true)?;
+            choose(&k, &mut v, true, args.choices)?;
             if v.len() == 0 {
                 continue;
             }
@@ -324,7 +332,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if args.last {
             hist.formats[0].clone()
         } else {
-            choose("Format", &mut hist.formats, false)?
+            choose("Format", &mut hist.formats, false, args.choices)?
         }
     };
 
@@ -336,6 +344,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             &fmt_str,
             i + 1,
             args.last,
+            args.choices,
         )?;
         let mut new_name = match ext {
             None => filename.with_file_name(fname),
