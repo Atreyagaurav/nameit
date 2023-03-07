@@ -38,10 +38,10 @@ If you use `*` in the format, it will use the first part of the old filename, mo
 # TODO 
 - [x] support user inputs
 - [x] save user inputs for later reuse
-- [ ] threshold for user inputs
+- [x] threshold for user inputs
 - [x] Copy or Replace current file flag (destination directory for copy)
 - [x] Batch Process
-- [ ] Replace or countup flag for same name conflicts
+- [x] Replace or countup flag for same name conflicts (Asks to replace for now)
 - [ ] Single Keypress if possible for input
 - [x] Add colors for different kind of input (choice+manual)
 - [ ] support file metadata extration for variables

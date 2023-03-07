@@ -48,6 +48,9 @@ struct Cli {
     /// mount points, you have to copy it separately.
     #[arg(short, long, action)]
     rename: bool,
+    /// Replace a file if same name is generated
+    #[arg(short = 'R', long, action)]
+    replace: bool,
     /// Edit saved choices
     ///
     /// Gives you interactive options to edit the choices. Use it to
@@ -367,6 +370,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         if args.test {
             continue;
+        }
+        if new_name.exists() {
+            if !args.replace {
+                print!(
+                    "{}: {:?} will be replaced by file {:?}, continue <y/N>? ",
+                    "Warning".on_yellow().bold(),
+                    filename,
+                    new_name
+                );
+                std::io::stdout().flush()?;
+                let mut buf = String::new();
+                std::io::stdin().read_line(&mut buf)?;
+                if !(buf.trim().to_lowercase() == "y") {
+                    continue;
+                }
+            }
         }
         if args.rename {
             std::fs::rename(filename, new_name)?;
