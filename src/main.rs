@@ -19,8 +19,8 @@ use terminal_size::{terminal_size, Width};
 enum NamePart<'a> {
     String(&'a str),
     Variable(&'a str),
+    Parameter(&'a str),
     Delimiter(&'a str),
-    UnParsed(&'a str),
 }
 
 #[derive(Clone)]
@@ -37,7 +37,7 @@ impl<'a> From<&'a str> for NameTemplate<'a> {
             match (c, flag) {
                 ('{', false) => {
                     if i != last {
-                        var_parts.push(NamePart::UnParsed(&st[last..i]));
+                        var_parts.push(NamePart::Variable(&st[last..i]));
                     }
                     last = i + 1;
                     flag = true;
@@ -53,7 +53,7 @@ impl<'a> From<&'a str> for NameTemplate<'a> {
                 ('}', false) => panic!("Invalid Format: unexpected '}}'"),
                 ('_', false) => {
                     if i != last {
-                        var_parts.push(NamePart::UnParsed(&st[last..i]));
+                        var_parts.push(NamePart::Variable(&st[last..i]));
                     }
                     var_parts.push(NamePart::Delimiter("_"));
                     last = i + 1;
@@ -65,34 +65,41 @@ impl<'a> From<&'a str> for NameTemplate<'a> {
             panic!("Invalid Format: Unclosed '{{'")
         }
         if last != st.len() {
-            var_parts.push(NamePart::UnParsed(&st[last..]));
+            var_parts.push(NamePart::Variable(&st[last..]));
         }
 
         let parts = var_parts
             .into_iter()
-            .map(|p| match p {
-                NamePart::UnParsed(u) => u.split("_").map(|s| NamePart::Variable(s)).collect(),
-                x => vec![x],
+            .map(|var| {
+                if let NamePart::Variable(v) = var {
+                    if "%*?#".contains(v.chars().next().expect("Empty Variable")) {
+                        NamePart::Parameter(v)
+                    } else {
+                        var
+                    }
+                } else {
+                    var
+                }
             })
-            .flatten()
             .collect();
         Self { parts }
     }
 }
 
-// impl ToString for NameTemplate<'_> {
-//     fn to_string(&self) -> String {
-//         self.parts
-//             .iter()
-//             .map(|p| match p {
-//                 NamePart::String(s) => s,
-//                 NamePart::Delimiter(d) => d,
-//                 _ => "",
-//             })
-//             .collect::<Vec<&str>>()
-//             .join("_")
-//     }
-// }
+impl ToString for NameTemplate<'_> {
+    fn to_string(&self) -> String {
+        self.parts
+            .iter()
+            .map(|p| match p {
+                NamePart::String(s) => s.to_string(),
+                NamePart::Delimiter(d) => d.to_string(),
+                NamePart::Variable(v) => format!("{}", v.on_blue()),
+                NamePart::Parameter(v) => format!("{}", v.on_yellow()),
+            })
+            .collect::<Vec<String>>()
+            .join("")
+    }
+}
 
 #[derive(Parser)]
 #[command(group = ArgGroup::new("action").required(false).multiple(false))]
@@ -324,14 +331,14 @@ fn choose(
     Ok(choice)
 }
 
-fn rename_filename(
+fn render_filename(
     cur: &str,
     hist: &mut History,
     templ: NameTemplate,
     num: usize,
     last: bool,
     max_choice: usize,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Vec<String>, Box<dyn Error>> {
     let vars: Vec<String> = templ
         .parts
         .into_iter()
@@ -346,40 +353,43 @@ fn rename_filename(
                         }
                     }
                     None => {
-                        if v.chars().all(|c| c == '#') {
-                            Ok(format!("{0:01$}", num, v.len()))
-                        } else if v == "?" {
-                            Ok(cur.to_string())
-                        } else if v.starts_with("%") {
-                            Ok(Local::now().format(&v).to_string())
-                        } else if v.chars().all(|c| c == '*') {
-                            Ok(format!(
-                                "{}",
-                                cur.split("_")
-                                    .take(v.len())
-                                    .collect::<Vec<&str>>()
-                                    .join("_")
-                            ))
-                        } else {
-                            hist.variables.insert(v.to_string());
-                            let mut newvec = vec![];
-                            // here since the variable is not new when --last
-                            // is used it won't happen, so I'll leave it be
-                            // interactive. Is manual format is given from
-                            // TUI, it'll need one time input.
-                            let var = choose(v, &mut newvec, false, max_choice);
-                            hist.values.insert(v.to_string(), newvec);
-                            var
-                        }
+                        hist.variables.insert(v.to_string());
+                        let mut newvec = vec![];
+                        // here since the variable is not new when --last
+                        // is used it won't happen, so I'll leave it be
+                        // interactive. Is manual format is given from
+                        // TUI, it'll need one time input.
+                        let var = choose(v, &mut newvec, false, max_choice);
+                        hist.values.insert(v.to_string(), newvec);
+                        var
                     }
                 },
+                NamePart::Parameter(p) => {
+                    if p.chars().all(|c| c == '#') {
+                        Ok(format!("{0:01$}", num, p.len()))
+                    } else if p == "?" {
+                        Ok(cur.to_string())
+                    } else if p.starts_with("%") {
+                        Ok(Local::now().format(&p).to_string())
+                    } else if p.chars().all(|c| c == '*') {
+                        Ok(format!(
+                            "{}",
+                            cur.split("_")
+                                .take(p.len())
+                                .collect::<Vec<&str>>()
+                                .join("_")
+                        ))
+                    } else {
+                        panic!("Unexpected Special Parameter: {p}")
+                    }
+                }
                 NamePart::Delimiter(d) => Ok(d.to_string()),
                 NamePart::String(s) => Ok(s.to_string()),
-                NamePart::UnParsed(_) => panic!("UnParsed shouldn't exist in this stage"),
+                // NamePart::UnParsed(_) => panic!("UnParsed shouldn't exist in this stage"),
             }
         })
         .collect::<Result<Vec<String>, Box<dyn Error>>>()?;
-    Ok(vars.join("").replace(" ", "-"))
+    Ok(vars)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -434,10 +444,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let templ = NameTemplate::from(fmt_str.as_str());
+    println!("{}: {}", "Template".yellow().bold(), templ.to_string());
 
     for (i, filename) in args.paths.iter().enumerate() {
+        println!("{}: {:?}", "File".blue().bold(), filename);
         let ext = filename.extension();
-        let fname = rename_filename(
+        let fname_parts: Vec<String> = render_filename(
             &filename.file_stem().unwrap_or_default().to_string_lossy(),
             &mut hist,
             templ.clone(),
@@ -445,6 +457,20 @@ fn main() -> Result<(), Box<dyn Error>> {
             args.last,
             args.choices,
         )?;
+        let fname_repr: String = NameTemplate {
+            parts: fname_parts
+                .iter()
+                .zip(&templ.parts)
+                .map(|(p, t)| match t {
+                    NamePart::String(_) => NamePart::String(p),
+                    NamePart::Delimiter(_) => NamePart::Delimiter(p),
+                    NamePart::Variable(_) => NamePart::Variable(p),
+                    NamePart::Parameter(_) => NamePart::Parameter(p),
+                })
+                .collect(),
+        }
+        .to_string();
+        let fname = fname_parts.join("").replace(" ", "-");
         let mut new_name = match ext {
             None => filename.with_file_name(fname),
             Some(e) => filename.with_file_name(format!(
@@ -460,7 +486,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             new_name = d.join(new_name.file_name().unwrap());
         }
         println!(
-            "{}: {:?} -> {:?}",
+            "{}: {:?} -> {}",
             (match (args.rename, args.r#move) {
                 (true, false) => "Rename",
                 (false, true) => "Move",
@@ -470,7 +496,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             .green()
             .bold(),
             filename,
-            new_name
+            // this is a HACK to just replace the rendered name, need
+            // to properly set it up somehow later.
+            format!("{:?}", new_name).replace(
+                &*new_name
+                    .with_extension("")
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy(),
+                &fname_repr
+            )
         );
         if args.test {
             continue;
