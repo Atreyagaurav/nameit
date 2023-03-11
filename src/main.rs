@@ -15,6 +15,85 @@ use std::{
 use term_grid;
 use terminal_size::{terminal_size, Width};
 
+#[derive(Clone)]
+enum NamePart<'a> {
+    String(&'a str),
+    Variable(&'a str),
+    Delimiter(&'a str),
+    UnParsed(&'a str),
+}
+
+#[derive(Clone)]
+struct NameTemplate<'a> {
+    parts: Vec<NamePart<'a>>,
+}
+
+impl<'a> From<&'a str> for NameTemplate<'a> {
+    fn from(st: &'a str) -> Self {
+        let mut var_parts = Vec::<NamePart>::new();
+        let mut last: usize = 0;
+        let mut flag = false;
+        for (i, c) in st.chars().enumerate() {
+            match (c, flag) {
+                ('{', false) => {
+                    if i != last {
+                        var_parts.push(NamePart::UnParsed(&st[last..i]));
+                    }
+                    last = i + 1;
+                    flag = true;
+                }
+                ('{', true) => panic!("Invalid Format: unexpected '{{'"),
+                ('}', true) => {
+                    if i != last {
+                        var_parts.push(NamePart::String(&st[last..i]));
+                    }
+                    last = i + 1;
+                    flag = false;
+                }
+                ('}', false) => panic!("Invalid Format: unexpected '}}'"),
+                ('_', false) => {
+                    if i != last {
+                        var_parts.push(NamePart::UnParsed(&st[last..i]));
+                    }
+                    var_parts.push(NamePart::Delimiter("_"));
+                    last = i + 1;
+                }
+                _ => (),
+            }
+        }
+        if flag {
+            panic!("Invalid Format: Unclosed '{{'")
+        }
+        if last != st.len() {
+            var_parts.push(NamePart::UnParsed(&st[last..]));
+        }
+
+        let parts = var_parts
+            .into_iter()
+            .map(|p| match p {
+                NamePart::UnParsed(u) => u.split("_").map(|s| NamePart::Variable(s)).collect(),
+                x => vec![x],
+            })
+            .flatten()
+            .collect();
+        Self { parts }
+    }
+}
+
+// impl ToString for NameTemplate<'_> {
+//     fn to_string(&self) -> String {
+//         self.parts
+//             .iter()
+//             .map(|p| match p {
+//                 NamePart::String(s) => s,
+//                 NamePart::Delimiter(d) => d,
+//                 _ => "",
+//             })
+//             .collect::<Vec<&str>>()
+//             .join("_")
+//     }
+// }
+
 #[derive(Parser)]
 #[command(group = ArgGroup::new("action").required(false).multiple(false))]
 struct Cli {
@@ -22,7 +101,7 @@ struct Cli {
     ///
     /// formats given in CLI are not saved in history, it helps when
     /// batch processing a list of files with similar format at once,
-    /// use `NNN` character format for zero padded numbers. If not
+    /// use `###` character format for zero padded numbers. If not
     /// given asks interactively.
     #[arg(short, long)]
     format: Option<String>,
@@ -35,7 +114,7 @@ struct Cli {
     /// Repeat Last choice
     ///
     /// Choose the first option for all the interactive choices. Be
-    /// careful using this one on formats without the number (N, NN,
+    /// careful using this one on formats without the number (#, ##,
     /// etc.) variable, as all the files will be names the same. And
     /// the number format will only work for a single execution, even
     /// if you've used it before for different files, it'll restart
@@ -74,7 +153,7 @@ struct Cli {
     /// Paths to rename
     ///
     /// If you have more than one path then any number of character
-    /// `N` in the format string will be replaced with the loop index
+    /// `#` in the format string will be replaced with the loop index
     /// (starting at 1), you can use that system to batch rename
     /// files.
     paths: Vec<PathBuf>,
@@ -248,51 +327,59 @@ fn choose(
 fn rename_filename(
     cur: &str,
     hist: &mut History,
-    fmt_str: &str,
+    templ: NameTemplate,
     num: usize,
     last: bool,
     max_choice: usize,
 ) -> Result<String, Box<dyn Error>> {
-    let vars: Vec<String> = fmt_str
-        .split("_")
-        .map(|v| match hist.values.get_mut(v) {
-            Some(mut k) => {
-                if last {
-                    Ok(k[0].clone())
-                } else {
-                    choose(v, &mut k, false, max_choice)
-                }
-            }
-            None => {
-                if v.chars().all(|c| c == '#') {
-                    Ok(format!("{0:01$}", num, v.len()))
-                } else if v == "?" {
-                    Ok(cur.to_string())
-                } else if v.starts_with("%") {
-                    Ok(Local::now().format(&v).to_string())
-                } else if v.chars().all(|c| c == '*') {
-                    Ok(format!(
-                        "{}",
-                        cur.split("_")
-                            .take(v.len())
-                            .collect::<Vec<&str>>()
-                            .join("_")
-                    ))
-                } else {
-                    hist.variables.insert(v.to_string());
-                    let mut newvec = vec![];
-                    // here since the variable is not new when --last
-                    // is used it won't happen, so I'll leave it be
-                    // interactive. Is manual format is given from
-                    // TUI, it'll need one time input.
-                    let var = choose(v, &mut newvec, false, max_choice);
-                    hist.values.insert(v.to_string(), newvec);
-                    var
-                }
+    let vars: Vec<String> = templ
+        .parts
+        .into_iter()
+        .map(|p| {
+            match p {
+                NamePart::Variable(v) => match hist.values.get_mut(v) {
+                    Some(mut k) => {
+                        if last {
+                            Ok(k[0].clone())
+                        } else {
+                            choose(v, &mut k, false, max_choice)
+                        }
+                    }
+                    None => {
+                        if v.chars().all(|c| c == '#') {
+                            Ok(format!("{0:01$}", num, v.len()))
+                        } else if v == "?" {
+                            Ok(cur.to_string())
+                        } else if v.starts_with("%") {
+                            Ok(Local::now().format(&v).to_string())
+                        } else if v.chars().all(|c| c == '*') {
+                            Ok(format!(
+                                "{}",
+                                cur.split("_")
+                                    .take(v.len())
+                                    .collect::<Vec<&str>>()
+                                    .join("_")
+                            ))
+                        } else {
+                            hist.variables.insert(v.to_string());
+                            let mut newvec = vec![];
+                            // here since the variable is not new when --last
+                            // is used it won't happen, so I'll leave it be
+                            // interactive. Is manual format is given from
+                            // TUI, it'll need one time input.
+                            let var = choose(v, &mut newvec, false, max_choice);
+                            hist.values.insert(v.to_string(), newvec);
+                            var
+                        }
+                    }
+                },
+                NamePart::Delimiter(d) => Ok(d.to_string()),
+                NamePart::String(s) => Ok(s.to_string()),
+                NamePart::UnParsed(_) => panic!("UnParsed shouldn't exist in this stage"),
             }
         })
         .collect::<Result<Vec<String>, Box<dyn Error>>>()?;
-    Ok(vars.join("_").replace(" ", "-"))
+    Ok(vars.join("").replace(" ", "-"))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -346,13 +433,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             choose("Format", &mut hist.formats, false, args.choices)?
         }
     };
+    let templ = NameTemplate::from(fmt_str.as_str());
 
     for (i, filename) in args.paths.iter().enumerate() {
         let ext = filename.extension();
         let fname = rename_filename(
             &filename.file_stem().unwrap_or_default().to_string_lossy(),
             &mut hist,
-            &fmt_str,
+            templ.clone(),
             i + 1,
             args.last,
             args.choices,
@@ -377,7 +465,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (true, false) => "Rename",
                 (false, true) => "Move",
                 (false, false) => "Copy",
-                _ => "Error",
+                _ => panic!("Forgot a case for CLI arguments related to move"),
             })
             .green()
             .bold(),

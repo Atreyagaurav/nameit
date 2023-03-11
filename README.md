@@ -26,6 +26,9 @@ you can run `nameit -e` to run an interactive session to filter the saved choice
 You can filter the formats, (remember that if you remove a format and there are variables only used in that format, you can remove them by entering 0 for the choices to filter), you can filter the choices for the variables. Press enter with no inputs to just leave it be, otherwise, use `start-end` format that'll only keep the choices in that range (inclusive). You can just use `-end` or `start-` format, if you want to just denote the lower and upper limit only. For example, `1-5` will keep entries 1 to 5, and remove everything else, while `-5` also has the same effect, and something like `3-` will keep everything from 3 onwards and only remove 1 and 2.
 
 # Special Template Variables
+## Literal String
+	If you want some string in the template, that is not a variable, put them inside curly braces. Anything in `{}` is render as it is (except for `{` or `}` itself which are invalid characters for name/template). For e.g. `NAME_{v}VER` will be rendered as `MyPlot_v1.0` if you input `MyPlot` and `1.0` for `NAME` and `VER` respectively.
+
 ## Date Time
 For date time use a format accepted by `date` command, for example, `%Y` is year in 4 digits format, `%m` is month, and so on. Using `%F` will give you the date in `YYYY-MM-DD` format. See `man date` for more formats. Program will panic on incorrect format.
 
