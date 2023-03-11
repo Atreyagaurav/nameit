@@ -1,5 +1,5 @@
 use chrono::Local;
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use colored::Colorize;
 use directories::ProjectDirs;
 use number_range::NumberRangeOptions;
@@ -16,6 +16,7 @@ use term_grid;
 use terminal_size::{terminal_size, Width};
 
 #[derive(Parser)]
+#[command(group = ArgGroup::new("action").required(false).multiple(false))]
 struct Cli {
     /// Format to rename the file in
     ///
@@ -41,16 +42,23 @@ struct Cli {
     /// from 1.
     #[arg(short, long, action)]
     last: bool,
-    /// Rename given file
-    ///
-    /// Instead of copying, rename the current file. Only works for
-    /// files in the same mount point, if you have files in different
-    /// mount points, you have to copy it separately.
-    #[arg(short, long, action)]
-    rename: bool,
     /// Replace a file if same name is generated
     #[arg(short = 'R', long, action)]
     replace: bool,
+    /// Rename given file instead of copying
+    ///
+    /// Only works for files in the same mount point, if you have
+    /// files in different mount points, you have to use `--move`
+    #[arg(short, long, action, group = "action")]
+    rename: bool,
+    /// Move a file instead of copying
+    ///
+    /// Unlike rename it works even in different mount point, but
+    /// moving is done by first copying the file and then removing the
+    /// original, so it'll take time, while rename is just changing
+    /// the name so it's fast
+    #[arg(short, long, action, group = "action")]
+    r#move: bool,
     /// Edit saved choices
     ///
     /// Gives you interactive options to edit the choices. Use it to
@@ -360,11 +368,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             )),
         };
         if let Some(d) = &args.destination {
-            new_name = d.join(new_name);
+            // if destination is given discard the parent directory information
+            new_name = d.join(new_name.file_name().unwrap());
         }
         println!(
             "{}: {:?} -> {:?}",
-            (if args.rename { "Rename" } else { "Copy" }).green().bold(),
+            (match (args.rename, args.r#move) {
+                (true, false) => "Rename",
+                (false, true) => "Move",
+                (false, false) => "Copy",
+                _ => "Error",
+            })
+            .green()
+            .bold(),
             filename,
             new_name
         );
@@ -391,6 +407,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::fs::rename(filename, new_name)?;
         } else {
             std::fs::copy(filename, new_name)?;
+            if args.r#move {
+                std::fs::remove_file(filename)?;
+            }
         }
     }
     save_history(&hist_file, &hist)?;
