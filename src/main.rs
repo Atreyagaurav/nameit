@@ -457,6 +457,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             args.last,
             args.choices,
         )?;
+        save_history(&hist_file, &hist)?;
+
         let fname_repr: String = NameTemplate {
             parts: fname_parts
                 .iter()
@@ -513,9 +515,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         if new_name.exists() {
             if !args.replace {
                 print!(
-                    "{}: {:?} will be replaced by file {:?}, continue <y/N>? ",
+                    "{}: {:?} already exists, replace <y/N>? ",
                     "Warning".on_yellow().bold(),
-                    filename,
                     new_name
                 );
                 std::io::stdout().flush()?;
@@ -535,6 +536,5 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    save_history(&hist_file, &hist)?;
     Ok(())
 }
