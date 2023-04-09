@@ -234,14 +234,12 @@ fn choose(
         }
 
         let mut i = 1;
-        let mut max_len = 0;
+        let mut max_len = 100;
         for h in &mut *vec {
             let prompt = format!("  [{}] {}", i, h);
-            max_len = if max_len > prompt.len() {
-                max_len
-            } else {
-                prompt.len()
-            };
+            if prompt.len() > max_len {
+                max_len = prompt.len();
+            }
             grid.add(term_grid::Cell::from(prompt));
             i += 1;
             if i > max_choice {
@@ -251,7 +249,7 @@ fn choose(
         let width: usize = if let Some((Width(w), _)) = terminal_size() {
             w.into()
         } else {
-            max_len + 1
+            max_len + 10
         };
         println!("{}", grid.fit_into_width(width).unwrap());
         let def = if filter {
@@ -416,7 +414,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         let new_vars: HashSet<&str> = hist
             .formats
             .iter()
-            .map(|s| s.split("_"))
+            .map(|s| {
+                let tmpl = NameTemplate::from(s.as_str());
+                tmpl.parts.into_iter().filter_map(|t| match t {
+                    NamePart::Variable(v) => Some(v),
+                    _ => None,
+                })
+            })
             .flatten()
             .collect();
         let mut new_values = HashMap::<String, Vec<String>>::new();
@@ -478,7 +482,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 })
                 .collect(),
         }
-        .to_string();
+        .to_string()
+        .replace(" ", "-");
         let fname = fname_parts.join("").replace(" ", "-");
         let mut new_name = match ext {
             None => filename.with_file_name(fname),
