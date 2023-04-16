@@ -10,9 +10,9 @@ chrono = "0.4.23"
 clap = { version = "4.1.8", features = ["derive"] }
 colored = "2.0.0"
 directories = "4.0.1"
+nu-term-grid = "0.78.0"
 number_range = "0.2.0"
 savefile-derive = "0.12.0"
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.93"
-term_grid = "0.2.0"
 terminal_size = "0.2.5"

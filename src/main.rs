@@ -2,6 +2,7 @@ use chrono::Local;
 use clap::{ArgGroup, Parser};
 use colored::Colorize;
 use directories::ProjectDirs;
+use nu_term_grid::grid;
 use number_range::NumberRangeOptions;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -12,7 +13,6 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
-use term_grid;
 use terminal_size::{terminal_size, Width};
 
 #[derive(Clone)]
@@ -222,25 +222,20 @@ fn choose(
 
     if !manual {
         println!("{} {}:", "Choices for".bold().blue(), prompt.bold().blue());
-        let mut grid = term_grid::Grid::new(term_grid::GridOptions {
-            filling: term_grid::Filling::Spaces(2),
-            direction: term_grid::Direction::LeftToRight,
+        let mut grd = grid::Grid::new(grid::GridOptions {
+            filling: grid::Filling::Spaces(2),
+            direction: grid::Direction::LeftToRight,
         });
         if !filter {
-            grid.add(term_grid::Cell::from(format!(
+            grd.add(grid::Cell::from(format!(
                 "[0] {} ",
                 "<new entry>".bold().yellow()
             )));
         }
 
         let mut i = 1;
-        let mut max_len = 100;
         for h in &mut *vec {
-            let prompt = format!("[{}] {} ", i, h);
-            if prompt.len() > max_len {
-                max_len = prompt.len();
-            }
-            grid.add(term_grid::Cell::from(prompt));
+            grd.add(grid::Cell::from(format!("[{}] {} ", i, h)));
             i += 1;
             if i > max_choice {
                 break;
@@ -251,10 +246,10 @@ fn choose(
         } else {
             100
         };
-        if let Some(g) = grid.fit_into_width(width) {
+        if let Some(g) = grd.fit_into_width(width) {
             println!("{}", g);
         } else {
-            println!("{}", grid.fit_into_columns(1));
+            println!("{}", grd.fit_into_columns(1));
         }
         let def = if filter {
             format!("1-{}", vec.len())
