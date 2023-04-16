@@ -228,7 +228,7 @@ fn choose(
         });
         if !filter {
             grid.add(term_grid::Cell::from(format!(
-                "[0] {}",
+                "[0] {} ",
                 "<new entry>".bold().yellow()
             )));
         }
@@ -236,7 +236,7 @@ fn choose(
         let mut i = 1;
         let mut max_len = 100;
         for h in &mut *vec {
-            let prompt = format!("  [{}] {}", i, h);
+            let prompt = format!("[{}] {} ", i, h);
             if prompt.len() > max_len {
                 max_len = prompt.len();
             }
@@ -249,9 +249,13 @@ fn choose(
         let width: usize = if let Some((Width(w), _)) = terminal_size() {
             w.into()
         } else {
-            max_len + 10
+            100
         };
-        println!("{}", grid.fit_into_width(width).unwrap());
+        if let Some(g) = grid.fit_into_width(width) {
+            println!("{}", g);
+        } else {
+            println!("{}", grid.fit_into_columns(1));
+        }
         let def = if filter {
             format!("1-{}", vec.len())
         } else {
