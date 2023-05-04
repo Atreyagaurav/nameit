@@ -18,7 +18,7 @@ For arch users,
 # Usage
 Run the command `nameit` with filename as argument to rename. Provide the choices for format, and then variables in that format. Use `_` to separate the variables in the format. For example, format `NAME_VER` will use two variables `NAME` and `VER`, you can give inputs to those variables. It'll remember your inputs and save it for later use. 
 
-When you have choices, enter the choice number to choose it, otherwise enter 0, and it'll give you the option to enter a new entry, it'll save that entry to the history.
+When you have choices, enter the choice number to choose it, otherwise enter 0, and it'll give you the option to enter a new entry, it'll save that entry to the history. There is a shortcut to entering a new entry. Instead of choosing 0, you can type the new entry starting with the character "/" it'll automatically use that entry and add it to the history.
 
 # Editing the Saved choices
 you can run `nameit -e` to run an interactive session to filter the saved choices. 

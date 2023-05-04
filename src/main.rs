@@ -298,9 +298,14 @@ fn choose(
                             }
                         }
                         Err(e) => {
-                            eprintln!("{}: {:?}", "Error".red(), e.kind());
-                            buf.clear();
-                            continue;
+                            if b.starts_with("/") {
+                                vec.push(b[1..].trim().to_string());
+                                vec.len()
+                            } else {
+                                eprintln!("{}: {:?}", "Error".red(), e.kind());
+                                buf.clear();
+                                continue;
+                            }
                         }
                     };
 
