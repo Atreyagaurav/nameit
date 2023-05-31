@@ -562,9 +562,9 @@ dependencies = [
 
 [[package]]
 name = "number_range"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a6ad9fbc045fc4d16b03f7cc0373a947811ecc54f0bbc2455c2425bcd4dd51"
+checksum = "2e87fafefd4b56971759e9938b394db50682ecd69a40fe3414c89bb88f27543c"
 dependencies = [
  "anyhow",
  "itertools",
